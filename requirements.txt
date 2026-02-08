@@ -1,0 +1,11 @@
+librosa
+pygame
+PyQt6
+PyOpenGL
+numpy
+opencv-python
+python-osc
+SpoutGL
+sacn
+dearpygui
+pedalboard
