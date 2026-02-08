@@ -1,0 +1,67 @@
+#version 430
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle {
+    vec4 pos_size; // x, y, z, size
+    vec4 vel_life; // vx, vy, vz, life
+};
+
+layout(std430, binding = 0) buffer ParticleBuffer {
+    Particle particles[];
+};
+
+// Uniforms
+uniform float deltaTime;
+uniform float time;
+uniform float beat_strength;
+uniform float sub_bass;
+uniform float presence;
+uniform float gravity;
+uniform float life_time;
+uniform float turbulence;
+uniform vec3 emitterPos; // Position de la source
+
+// Pseudo-random function
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    
+    Particle p = particles[id];
+    
+    // Mise à jour de la durée de vie
+    p.vel_life.w -= deltaTime;
+    
+    // Physique (identique à particle_update.comp)
+    vec3 vel = p.vel_life.xyz;
+    vec3 pos = p.pos_size.xyz;
+    
+    vel.y -= gravity * deltaTime;
+    
+    if (turbulence > 0.0) {
+        vec3 noise = vec3(rand(vec2(id, time)) - 0.5, rand(vec2(id + 100, time)) - 0.5, rand(vec2(id + 200, time)) - 0.5);
+        vel += noise * turbulence * deltaTime * 5.0;
+    }
+    
+    pos += vel * deltaTime;
+    
+    // Réapparition si la particule est "morte"
+    if (p.vel_life.w <= 0.0) {
+        // Apparaît à la position de l'émetteur
+        pos = emitterPos;
+        
+        // Vitesse initiale aléatoire (effet d'explosion/fontaine)
+        vec3 random_dir = normalize(vec3(rand(vec2(id, time)) - 0.5, rand(vec2(id+1, time)) - 0.5, rand(vec2(id+2, time)) - 0.5));
+        vel = random_dir * (2.0 + sub_bass * 10.0); // Vitesse initiale boostée par les basses
+        
+        p.vel_life.w = life_time * (0.5 + rand(vec2(id, time + 1.0)));
+        p.pos_size.w = 0.02 + presence * 0.05;
+    }
+    
+    // Sauvegarde des données
+    p.pos_size.xyz = pos;
+    p.vel_life.xyz = vel;
+    particles[id] = p;
+}
